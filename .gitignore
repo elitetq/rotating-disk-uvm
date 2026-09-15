@@ -1,0 +1,20 @@
+# XSim artifacts
+xsim.dir/
+*.wdb
+*.jou
+*.pb
+*.str
+webtalk*
+xvlog.log
+xelab.log
+xsim.log
+.Xil/
+
+# Build outputs
+sim/logs/
+sim/run/
+sim/xsim.covdb/
+sim/cov_report/
+
+# Python
+__pycache__/
