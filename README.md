@@ -1,154 +1,203 @@
-# Building a UVM Verification Environment for the Rotating Disk Controller
+# Rotating Disk Controller — UVM Verification Environment
 
-A self-teaching guide. You write every line of the testbench; this guide tells you what to
-write, why, in what order, and how to know when each piece works.
+A UVM testbench for a proportional position controller for a rotating disk: a quadrature
+encoder decoder, a magnitude clamp, an N-bit PWM generator, and the closed-loop controller
+that ties them together. Constrained-random stimulus, self-checking scoreboards against
+golden models, SystemVerilog assertions bound to the RTL, and functional coverage, all
+running on Vivado XSim.
 
----
-
-## What this is
-
-You have a working proportional position controller in
-`enel441_453_lab.srcs/sources_1/new/`. It is verified today by fifteen directed testbenches
-in `sim_1/new/` — the `$display("PASS Check 3: ...")` style. Those are good testbenches.
-They prove the design works **for the cases you thought of**.
-
-This guide walks you through replacing that with a UVM environment: constrained-random
-stimulus, self-checking scoreboards driven by golden models, SystemVerilog assertions bound
-to the RTL, functional coverage, and a seeded regression. The end state is a standalone git
-repo you can link from a resume, plus the ability to answer the questions an interviewer
-will ask about it.
-
-**The design is the point.** Every formula, every corner case, every assertion in this guide
-was derived from *your* RTL, not from a generic tutorial. `02_design_under_test.md` is the
-analysis; the phase guides turn it into a testbench.
-
-## What this is not
-
-- **Not a code drop.** Skeletons here show structure, port lists and boilerplate macros.
-  The logic is marked `// TODO(you):` with a hint and usually the name of the method you
-  need. If you copy a skeleton and run it, it will compile and do nothing useful. That is
-  deliberate.
-- **Not a UVM reference manual.** The ten tutorials in `tutorials/` cover the concepts you
-  will hit, each in about two pages, and then point you at the canonical sources.
-- **Not exhaustive verification.** `enel453_lab_initializer`, `debounce`, `status_7seg` and
-  the ROM playback path are out of scope. Say so in your results document — scoping honestly
-  is part of the skill.
-
-## The one exception to "you write it"
-
-Build infrastructure — the Makefile, the filelists, `regress.py` — is given complete in
-`01_toolchain.md`. Typing a Makefile teaches you nothing about verification, and a broken
-build will stall you for a day. Copy those out and move on.
+> ### ⚠️ Status: not built yet
+>
+> This is work in progress and early. Today the repo has the build infrastructure, the
+> interfaces, the testbench tops and a UVM smoke test; the agents, environments,
+> scoreboards, assertions and tests are still stubs. Nothing here verifies anything yet.
+> **The commands below describe how it is meant to be driven once it is built** — most of
+> them will not do anything useful in the meantime. See
+> [Current state](#current-state) for what actually runs.
 
 ---
 
-## The ladder
+## About this project
 
-Four DUTs, in increasing difficulty. Each phase reuses what the last one built.
+This is a **learning project**. I am teaching myself UVM, and I am not a professional
+verification engineer — expect things that a practitioner would do differently, and expect
+the structure to change as I learn why it should.
 
-| Phase | DUT | Time | The new idea |
-|:--:|---|:--:|---|
-| **0** | — | ½ day | Fix a real bug in your RTL, prove UVM runs on XSim, set up the repo. |
-| **A** | `pwm_n_bit` | ~1 wk | Every UVM moving part, on a DUT simple enough that any failure is obviously *your* bug. |
-| **B** | `magnitude_clamp` | 3–4 d | Constrained randomization. Combinational DUT, so all the difficulty is in the stimulus. |
-| **C** | `decoder_to_32_bit` | 1.5–2 wk | A driver that speaks a **protocol** instead of writing values. This is the phase that makes the project worth showing. |
-| **D** | `prop_ctrl_pwm` | 1.5–2 wk | Integration: reuse the Phase A and C agents unchanged, model the whole control law, check a closed loop. |
-| **E** | — | ~1 wk | Regression, coverage closure, and packaging it so someone else can understand it. |
+**Every line of code in this repo is written by me.** I used Claude for the surrounding
+work: planning the build order, explaining concepts, reviewing my reasoning, and writing
+the private study notes I work from. The testbench itself — interfaces, agents, golden
+models, assertions, covergroups, tests — is mine, typed out by hand, because writing it is
+the entire point of the exercise.
 
-Roughly six to eight weeks part-time. It is not a weekend project, and the parts that take
-longest (C and D) are the parts worth talking about.
-
----
-
-## How to read this
-
-**Start here, in order:**
-
-1. `01_toolchain.md` — get XSim running UVM *before* you write anything real. Half a day.
-2. `02_design_under_test.md` — the analysis of your RTL. Read it once now, then keep it open
-   for the rest of the project. Every golden-model formula in the testbench comes from here.
-3. `03_verification_plan.md` — fill this in before writing tests. Writing a vplan first feels
-   like bureaucracy; it is the difference between "I wrote some random tests" and "I verified
-   this design", and interviewers can tell which one you did.
-4. `00_roadmap.md` — the checklist you actually work from, with acceptance gates.
-
-**Then, one per phase:** `04_phase_a_pwm.md` → `05_phase_b_clamp.md` →
-`06_phase_c_quadrature.md` → `07_phase_d_integration.md` → `08_regression_coverage.md`.
-
-**Reference as needed:** `tutorials/T1`–`T10`, and `09_portfolio.md` at the very end.
-
-### If you have never written a class in SystemVerilog
-
-Read `tutorials/T2_classes.md` before Phase A. It is deliberately short — you need maybe
-15% of SystemVerilog's OOP to write UVM, and the guide sticks to that 15%.
-
-### If you have never written an assertion
-
-Read `tutorials/T8_sva_and_bind.md` before Phase A. `bind` in particular is worth learning
-early: it lets you attach assertions to a module **without editing the module**, which means
-your RTL stays exactly as it synthesizes.
+The `rtl/` directory is a vendored copy of my own coursework design (see
+[`rtl/PROVENANCE.md`](rtl/PROVENANCE.md) for the exact source commit and the two local
+changes made to it). It is the device under test, not part of the verification work.
 
 ---
 
-## Ground rules that make this work
+## Requirements
 
-**Simulate after every increment.** The single most common way to fail at this is to write
-six components, hit compile, and face 200 errors with no idea which layer is wrong. Every
-phase in this guide is broken into steps that each end with a working simulation. Follow
-that.
-
-**When something fails, suspect the testbench first.** Your RTL has been on real hardware.
-For the first three phases, if the scoreboard disagrees with the DUT, the scoreboard is
-probably wrong. This flips at Phase D.
-
-**Commit at every acceptance gate.** `git log` is the story of the project. A history that
-reads "Phase A: driver + sequencer running" → "Phase A: scoreboard catches injected fault"
-is worth more than one commit called "uvm stuff".
-
-**Keep a bug/observation log from day one.** `docs/results.md`. Every time you find
-something surprising — an off-by-one, an unreachable state, a parameter that breaks
-elaboration — write it down with the evidence. That file is the most valuable artifact you
-will produce.
-
----
-
-## Index
-
-| File | What it is |
+| | |
 |---|---|
-| `00_roadmap.md` | The working checklist, with per-task acceptance gates. |
-| `01_toolchain.md` | XSim + UVM setup, smoke test, Makefile, filelists, regression runner, waveforms, troubleshooting. |
-| `02_design_under_test.md` | Analysis of your RTL. Golden-model formulas with derivations, corner cases, parameter traps, runtime math. |
-| `03_verification_plan.md` | Verification plan template, partly pre-filled. |
-| `04_phase_a_pwm.md` | Phase A build guide — `pwm_n_bit`. |
-| `05_phase_b_clamp.md` | Phase B build guide — `magnitude_clamp`. |
-| `06_phase_c_quadrature.md` | Phase C build guide — `decoder_to_32_bit`. |
-| `07_phase_d_integration.md` | Phase D build guide — `prop_ctrl_pwm`. |
-| `08_regression_coverage.md` | Regression, coverage closure, results write-up. |
-| `09_portfolio.md` | README template, resume phrasing, interview self-quiz. |
-| `tutorials/T1_interfaces.md` | Interfaces, modports, clocking blocks, and the race they prevent. |
-| `tutorials/T2_classes.md` | The 15% of SystemVerilog OOP that UVM needs. |
-| `tutorials/T3_phases_objections.md` | UVM phases and objections. Why your sim hangs or ends instantly. |
-| `tutorials/T4_config_db.md` | `uvm_config_db`, virtual interfaces, and wildcard pitfalls. |
-| `tutorials/T5_factory.md` | The factory, `type_id::create`, and overrides. |
-| `tutorials/T6_tlm.md` | Analysis ports, subscribers, `uvm_analysis_imp_decl`. |
-| `tutorials/T7_randomization.md` | `rand`, constraints, `dist`, `solve...before`, inline constraints. |
-| `tutorials/T8_sva_and_bind.md` | SVA and `bind`. |
-| `tutorials/T9_coverage.md` | Covergroups, bins, crosses, closure. |
-| `tutorials/T10_debugging_xsim.md` | Debugging UVM under XSim specifically. |
+| Simulator | Vivado XSim, 2025.2 (any recent release should work) |
+| UVM | UVM-1.2, the copy that ships with Vivado — nothing to install |
+| Build | GNU make, Python 3 for the regression runner |
+
+The Makefile looks for Vivado under `$HOME/Vivado/2025.2`. Point it elsewhere with
+`XILINX_ROOT`, either per-invocation or in your environment:
+
+```sh
+make XILINX_ROOT=/tools/Xilinx/Vivado/2024.1
+```
+
+Vivado does not have to be on your `PATH`; the Makefile calls `xvlog`, `xelab`, `xsim` and
+`xcrg` by absolute path.
 
 ---
 
-## Before you start
+## Running a simulation
 
-Two facts you should know going in.
+Everything is driven from the `sim/` directory.
 
-**UVM is object-oriented and there is no way around that.** You chose the lean version, and
-this guide holds to it: the class code stays short, formulaic and macro-heavy — roughly 600
-lines across the whole project, most of it copy-adapted after Phase A. The interesting work
-lives in interfaces, assertions, covergroups, and a package of pure functions that model the
-DUT. But you will write classes, and `tutorials/T2` exists so that is not a wall.
+```sh
+cd sim
+make                    # compile + elaborate + run the default test
+```
 
-**There is a bug in your RTL right now.** It is on the `mvp_changes` branch, your synthesis
-log already reported it, and Step 0 has you fix it before anything else. Details in
-`00_roadmap.md` and `02_design_under_test.md`. Start there.
+`make` is compile → elaborate → run in one step; `make compile` and `make elab` stop early
+if you only want to check that things build.
+
+### Choosing what to run
+
+The testbench is split into four independent phases, one per device under test. Select one
+with `PHASE`, and a test within it with `TEST`:
+
+```sh
+make PHASE=pwm                          # the default
+make PHASE=clamp TEST=clamp_random_test
+make PHASE=quad  TEST=quad_direction_test SEED=42
+make PHASE=ctrl  TEST=ctrl_step_response_test VERBOSITY=UVM_HIGH
+```
+
+| Knob | Values | Default | What it does |
+|---|---|---|---|
+| `PHASE` | `pwm`, `clamp`, `quad`, `ctrl` | `pwm` | Picks the DUT, its filelist and its testbench top |
+| `TEST` | a UVM test class name | `<PHASE>_smoke_test` | Passed through as `+UVM_TESTNAME` |
+| `SEED` | integer | `1` | Randomization seed (`-sv_seed`) |
+| `VERBOSITY` | `UVM_LOW`, `UVM_MEDIUM`, `UVM_HIGH`, `UVM_DEBUG` | `UVM_MEDIUM` | UVM report verbosity |
+| `WAVES` | `0`, `1` | `0` | Dump a waveform database |
+| `COV` | `0`, `1` | `0` | Collect functional coverage |
+| `TIMEOUT` | a delay | `20ms` | Global watchdog, read as `+UVM_TIMEOUT` |
+| `XILINX_ROOT` | path | `$HOME/Vivado/2025.2` | Where Vivado lives |
+
+`make help` prints the same list.
+
+Which DUT each phase drives:
+
+| Phase | DUT | What it is |
+|---|---|---|
+| `pwm` | `pwm_n_bit` | N-bit PWM generator with a duty deadband |
+| `clamp` | `magnitude_clamp` | Combinational saturation of a signed command |
+| `quad` | `decoder_to_32_bit` | Quadrature encoder decoder — a protocol, not a value |
+| `ctrl` | `prop_ctrl_pwm` | The whole proportional loop, integrating the blocks above |
+
+Out of scope, and unverified on purpose: `enel453_lab_initializer`, `debounce`,
+`status_7seg`, and the ROM playback path.
+
+### Logs
+
+Every run writes to `sim/logs/`:
+
+```
+logs/xvlog.<phase>.log            compile
+logs/xelab.<phase>.log            elaboration
+logs/<phase>.<test>.<seed>.log    simulation
+```
+
+A run passed if the UVM report summary at the end of the simulation log shows no
+`UVM_ERROR` or `UVM_FATAL`. Check it before believing an exit code.
+
+### Waveforms
+
+```sh
+make WAVES=1                            # batch run, dumps logs/<phase>_<test>_<seed>.wdb
+make gui                                # interactive, opens the XSim GUI
+```
+
+`WAVES=1` elaborates with `-debug typical` and runs `waves.tcl`, which decides what gets
+dumped. Open a saved database later with:
+
+```sh
+xsim --gui logs/pwm_pwm_smoke_test_1.wdb
+```
+
+### Coverage
+
+```sh
+make COV=1 PHASE=pwm TEST=pwm_random_test SEED=1
+make COV=1 PHASE=pwm TEST=pwm_random_test SEED=2
+make cov                                # merge everything into cov_report/
+```
+
+Each `COV=1` run drops a database in `sim/xsim.covdb/` named
+`<phase>_<test>_<seed>`; `make cov` merges whatever is there into an HTML report at
+`sim/cov_report/index.html`. The `xcrg` flags differ between Vivado releases — if the merge
+fails, `xcrg -help` is the place to look.
+
+### Regressions
+
+`sim/regress.py` is the seeded multi-test runner. **Not written yet** — it is an empty file
+today.
+
+### Cleaning up
+
+```sh
+make clean                              # build artifacts, logs, waveforms
+make veryclean                          # also coverage databases and reports
+```
+
+---
+
+## Current state
+
+What actually runs today, on Vivado 2025.2:
+
+- **UVM smoke test** — proves the UVM library elaborates and runs under XSim:
+
+  ```sh
+  cd sim && make PHASE=hello TOP=tb_hello TEST=hello_test
+  ```
+
+  Prints `UVM is alive on XSim` and exits. (`TOP` has to be given explicitly here because
+  this top is named `tb_hello`, not `tb_hello_top`.)
+
+- **`make PHASE=pwm`** — compiles and runs, but the stimulus is a hardcoded `initial`
+  block in `tb/top/tb_pwm_top.sv`, not a UVM driver. `run_test()` is still commented out,
+  so `TEST` is ignored. It exercises the DUT; it checks nothing.
+
+Everything else is an empty file: all four agents, all four environments, all the test
+packages, the assertion modules, and three of the five filelists. `PHASE=clamp`, `quad` and
+`ctrl` will not build.
+
+---
+
+## Repository layout
+
+```
+rtl/                    Device under test — vendored, see PROVENANCE.md
+tb/
+  common/               Interfaces, shared types, DUT golden-model functions
+    sva/                Assertion modules, bound to the RTL without editing it
+  agents/               One UVM agent per interface protocol
+  env/                  Per-phase environments: agents + scoreboard + coverage
+  tests/                Sequences and tests
+  top/                  Per-phase testbench tops — clock, DUT, interface, run_test
+sim/
+  Makefile              The build; see `make help`
+  filelists/            One compile filelist per phase
+  regress.py            Seeded regression runner (not written yet)
+  waves.tcl             What to dump when WAVES=1
+```
+
+Assertions live in separate modules attached with `bind`, so the RTL in `rtl/` stays
+exactly as it synthesizes — no testbench code is ever added to a design file.

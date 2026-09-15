@@ -18,3 +18,5 @@ sim/cov_report/
 
 # Python
 __pycache__/
+# Private study notes — not published
+docs/
