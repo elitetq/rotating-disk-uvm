@@ -20,3 +20,6 @@ sim/cov_report/
 __pycache__/
 # Private study notes — not published
 docs/
+
+# Learning files
+tb/top/scrap/

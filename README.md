@@ -9,8 +9,9 @@ running on Vivado XSim.
 > ### ⚠️ Status: not built yet
 >
 > This is work in progress and early. Today the repo has the build infrastructure, the
-> interfaces, the testbench tops and a UVM smoke test; the agents, environments,
-> scoreboards, assertions and tests are still stubs. Nothing here verifies anything yet.
+> interfaces, the PWM golden model, the testbench tops and a UVM smoke test; the agents,
+> environments, scoreboards, assertions and tests are still stubs or half-written. Nothing
+> here verifies anything yet.
 > **The commands below describe how it is meant to be driven once it is built** — most of
 > them will not do anything useful in the meantime. See
 > [Current state](#current-state) for what actually runs.
@@ -171,13 +172,20 @@ What actually runs today, on Vivado 2025.2:
   Prints `UVM is alive on XSim` and exits. (`TOP` has to be given explicitly here because
   this top is named `tb_hello`, not `tb_hello_top`.)
 
-- **`make PHASE=pwm`** — compiles and runs, but the stimulus is a hardcoded `initial`
-  block in `tb/top/tb_pwm_top.sv`, not a UVM driver. `run_test()` is still commented out,
-  so `TEST` is ignored. It exercises the DUT; it checks nothing.
+- **Golden model** — `tb/common/dut_pkg.sv` is real: `expected_pwm_high(duty, threshold)`
+  and `pwm_period(bits)`, pure functions with no UVM dependency. Hand-checked against a
+  table of duty values by a throwaway top in `tb/top/scrap/`.
 
-Everything else is an empty file: all four agents, all four environments, all the test
-packages, the assertion modules, and three of the five filelists. `PHASE=clamp`, `quad` and
-`ctrl` will not build.
+- **`make PHASE=pwm`** — does not compile right now. The top has been switched over: the
+  hardcoded `initial` block is commented out and `run_test()`, plus the `uvm_config_db`
+  handoff of `vif`, `BITS` and `THRESHOLD`, are live. Compilation now stops in
+  `pwm_agent_pkg.sv`, which holds a half-written `pwm_item` sequence item (`duty`,
+  `hold_periods`, constraints still empty) not yet wrapped in a `package` that imports
+  `uvm_pkg` — so the field macros are undefined.
+
+Still empty: three of the four agents, all four environments, all the test packages, the
+assertion modules, and three of the five filelists. `PHASE=clamp`, `quad` and `ctrl` will
+not build.
 
 ---
 
@@ -192,6 +200,7 @@ tb/
   env/                  Per-phase environments: agents + scoreboard + coverage
   tests/                Sequences and tests
   top/                  Per-phase testbench tops — clock, DUT, interface, run_test
+    scrap/              Throwaway experiments with their own Makefile — gitignored
 sim/
   Makefile              The build; see `make help`
   filelists/            One compile filelist per phase
