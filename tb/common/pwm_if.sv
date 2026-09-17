@@ -1,6 +1,6 @@
 interface pwm_if(input logic clk);
 
-    localparam MAX_BITS = 16; // Adjust if more slack is needed for UVM
+    localparam MAX_BITS = 32; // Adjust if more slack is needed for UVM
 
     logic                   reset;
     logic [MAX_BITS-1:0]    duty;

@@ -4,7 +4,7 @@ module tb_pwm_top;
 
   import uvm_pkg::*;
   `include "uvm_macros.svh"
-//   import pwm_tests_pkg::*;
+  import pwm_tests_pkg::*;
 
   localparam int  BITS       = 8;
   localparam int  THRESHOLD  = 14;
