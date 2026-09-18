@@ -1,12 +1,9 @@
-import uvm_pkg::*;
-`include "uvm_macros.svh"
-
 class pwm_driver extends uvm_driver #(pwm_item);
 
   `uvm_component_utils(pwm_driver)
 
-  virtual pwm_if vif; // vif handle is not instantiated instantly, but rather in build_phase
-  int unsigned   bits; // get from db to find out pwm bits
+  virtual pwm_if  vif; // vif handle is not instantiated instantly, but rather in build_phase
+  int             bits; // get from db to find out pwm bits
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -15,18 +12,17 @@ class pwm_driver extends uvm_driver #(pwm_item);
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     if (!uvm_config_db#(virtual pwm_if)::get(this, "", "vif", vif))
-      `uvm_fatal("NOVIF", {"virtual interface not set for ", get_full_name()})
+      `uvm_fatal(get_full_name(), {"virtual interface not set for ", get_full_name()})
     if (!uvm_config_db#(int)::get(this, "", "BITS", bits))
-      `uvm_fatal("NOCFG", "BITS not set")
+      `uvm_fatal(get_full_name(), "BITS not set")
   endfunction
 
   task run_phase(uvm_phase phase);
     // Pins reset to known state
     vif.drv_cb.reset <= 1;
     vif.drv_cb.duty <= '0;
-    repeat(5) @(vif.drv_cb);
+    repeat(5) @(2*(2**bits)); // two full pwm periods
     vif.drv_cb.reset <= 0;
-    repeat(2) @(vif.drv_cb);
 
     forever begin
       automatic pwm_item item;

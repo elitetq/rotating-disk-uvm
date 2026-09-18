@@ -1,3 +1,5 @@
+// sequence transactions
+
 `include "uvm_macros.svh"
 
 class pwm_item extends uvm_sequence_item;
@@ -17,12 +19,16 @@ class pwm_item extends uvm_sequence_item;
     super.new(name);
   endfunction
 
+  function void pre_randomize(); // called just before .randomize()
+    assert(64'(2**max_bits-1) > 0);
+  endfunction
+
   constraint c_hold {
     hold_periods inside {[1:3]};
   }
 
   constraint c_range {
-    duty inside {[0:2**max_bits-1]};
+    duty inside {[0:64'(2**max_bits-1)]};
   }
   
 
