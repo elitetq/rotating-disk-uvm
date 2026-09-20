@@ -20,15 +20,16 @@ class pwm_item extends uvm_sequence_item;
   endfunction
 
   function void pre_randomize(); // called just before .randomize()
-    assert(64'(2**max_bits-1) > 0);
+    assert(max_bits inside {[1:32]}) else 
+      `uvm_error("ASTERR","max_bits assertion failed")
   endfunction
 
   constraint c_hold {
-    hold_periods inside {[1:3]};
+    soft hold_periods inside {[1:4]};
   }
 
   constraint c_range {
-    duty inside {[0:64'(2**max_bits-1)]};
+    soft duty inside {[0:(64'b1 << max_bits) - 1]};
   }
   
 

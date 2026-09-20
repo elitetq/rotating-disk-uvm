@@ -6,14 +6,15 @@ that ties them together. Constrained-random stimulus, self-checking scoreboards 
 golden models, SystemVerilog assertions bound to the RTL, and functional coverage, all
 running on Vivado XSim.
 
-> ### ⚠️ Status: not built yet
+> ### ⚠️ Status: Phase A works, the rest is not built
 >
-> This is work in progress and early. Today the repo has the build infrastructure, the
-> interfaces, the PWM golden model, the testbench tops and a UVM smoke test; the agents,
-> environments, scoreboards, assertions and tests are still stubs or half-written. Nothing
-> here verifies anything yet.
-> **The commands below describe how it is meant to be driven once it is built** — most of
-> them will not do anything useful in the meantime. See
+> Phase A (`pwm_n_bit`) is a working self-checking UVM environment — interface, agent,
+> monitor, scoreboard and a constrained-random test that runs clean against the golden
+> model. Functional coverage is half-wired and the assertions are not written yet. Phases
+> B, C and D — the magnitude clamp, the quadrature decoder and the integrated controller —
+> are still empty stubs.
+> **The commands below describe how the whole thing is meant to be driven once it is
+> built**; outside Phase A most of them will not do anything useful. See
 > [Current state](#current-state) for what actually runs.
 
 ---
@@ -83,9 +84,9 @@ make PHASE=ctrl  TEST=ctrl_step_response_test VERBOSITY=UVM_HIGH
 | Knob | Values | Default | What it does |
 |---|---|---|---|
 | `PHASE` | `pwm`, `clamp`, `quad`, `ctrl` | `pwm` | Picks the DUT, its filelist and its testbench top |
-| `TEST` | a UVM test class name | `<PHASE>_smoke_test` | Passed through as `+UVM_TESTNAME` |
+| `TEST` | a UVM test class name | `<PHASE>_base_test` | Passed through as `+UVM_TESTNAME` |
 | `SEED` | integer | `1` | Randomization seed (`-sv_seed`) |
-| `VERBOSITY` | `UVM_LOW`, `UVM_MEDIUM`, `UVM_HIGH`, `UVM_DEBUG` | `UVM_MEDIUM` | UVM report verbosity |
+| `VERBOSITY` | `UVM_LOW`, `UVM_MEDIUM`, `UVM_HIGH`, `UVM_DEBUG` | `UVM_HIGH` | UVM report verbosity |
 | `WAVES` | `0`, `1` | `0` | Dump a waveform database |
 | `COV` | `0`, `1` | `0` | Collect functional coverage |
 | `TIMEOUT` | a delay | `20ms` | Global watchdog, read as `+UVM_TIMEOUT` |
@@ -129,14 +130,14 @@ make gui                                # interactive, opens the XSim GUI
 dumped. Open a saved database later with:
 
 ```sh
-xsim --gui logs/pwm_pwm_smoke_test_1.wdb
+xsim --gui logs/pwm_pwm_base_test_1.wdb
 ```
 
 ### Coverage
 
 ```sh
-make COV=1 PHASE=pwm TEST=pwm_random_test SEED=1
-make COV=1 PHASE=pwm TEST=pwm_random_test SEED=2
+make COV=1 PHASE=pwm TEST=pwm_base_test SEED=1
+make COV=1 PHASE=pwm TEST=pwm_base_test SEED=2
 make cov                                # merge everything into cov_report/
 ```
 
@@ -176,16 +177,37 @@ What actually runs today, on Vivado 2025.2:
   and `pwm_period(bits)`, pure functions with no UVM dependency. Hand-checked against a
   table of duty values by a throwaway top in `tb/top/scrap/`.
 
-- **`make PHASE=pwm`** — does not compile right now. The top has been switched over: the
-  hardcoded `initial` block is commented out and `run_test()`, plus the `uvm_config_db`
-  handoff of `vif`, `BITS` and `THRESHOLD`, are live. Compilation now stops in
-  `pwm_agent_pkg.sv`, which holds a half-written `pwm_item` sequence item (`duty`,
-  `hold_periods`, constraints still empty) not yet wrapped in a `package` that imports
-  `uvm_pkg` — so the field macros are undefined.
+- **Phase A runs end to end and checks itself.**
 
-Still empty: three of the four agents, all four environments, all the test packages, the
-assertion modules, and three of the five filelists. `PHASE=clamp`, `quad` and `ctrl` will
-not build.
+  ```sh
+  cd sim && make PHASE=pwm TEST=pwm_base_test
+  ```
+
+  Compiles, elaborates and runs clean — `UVM_ERROR : 0`, with the scoreboard reporting on
+  50 randomized duty values. The whole loop is in place:
+
+  - `tb/common/pwm_if.sv` — one interface with `drv_cb` / `mon_cb` clocking blocks and a
+    wide `MAX_BITS` bus the top narrows to the DUT's parameter.
+  - `tb/top/tb_pwm_top.sv` — clock, DUT, interface, and the `uvm_config_db` handoff of
+    `vif`, `BITS` and `THRESHOLD` before `run_test()`.
+  - `tb/agents/pwm_agent/` — `pwm_item` (constrained `duty` and `hold_periods`),
+    `pwm_driver`, `pwm_monitor`, a typedef'd sequencer and `pwm_agent`, all `` `include ``d
+    into `pwm_agent_pkg.sv`. The driver and sequencer are gated on `get_is_active()`, so
+    the agent is already usable passively — which is what Phase D needs.
+  - `tb/env/pwm_env.sv` + `pwm_scoreboard.sv` — the monitor's analysis port fans out to a
+    scoreboard that checks every completed period against `dut_pkg::expected_pwm_high`.
+  - `tb/tests/` — `pwm_base_seq` and `pwm_base_test`.
+
+  The monitor integrates `pwm_out` over a full `2**BITS` period and marks periods where
+  `duty` moved mid-period; the scoreboard skips those rather than scoring them.
+
+- **Functional coverage (Step A7) — in progress.** `tb/env/pwm_coverage.sv` is written and
+  `pwm_env` creates and connects it, but it is not yet `` `include ``d in
+  `pwm_env_pkg.sv`, so nothing compiles it and the run above reports no coverage yet.
+
+Still empty: the `clamp`, `quad` and `ctrl` interfaces, environments, test packages and
+tops; every assertion module and `bind_all.sv`; three of the five filelists; and
+`regress.py`. `PHASE=clamp`, `quad` and `ctrl` will not build.
 
 ---
 

@@ -45,9 +45,9 @@ class pwm_monitor extends uvm_monitor;
         pwmt.period_cycles = 0;
 
         forever begin
-            @(posedge vif.mon_cb);
+            @(vif.mon_cb);
 
-            if(vif.mon_cb.reset) begin // reset hit
+            if(vif.mon_cb.reset !== 0) begin // measuring
                 if(pwmt.period_cycles) begin
                     pwmt.valid_period = 0;
                     ap.write(pwmt); // early reset condition, no period travelled
@@ -55,11 +55,11 @@ class pwm_monitor extends uvm_monitor;
                 end
                 pwmt.high_cycles = 0;
                 pwmt.period_cycles = 0;
-            end else begin // measuring
+            end else begin // reset hit
                 if(!pwmt.period_cycles) begin // one period sample
                     pwmt.duty = vif.mon_cb.duty & ((1 << bits) - 1);
                     pwmt.valid_period = 1;
-                end else if(pwmt.duty != vif.mon_cb.duty & ((1 << bits) - 1)) begin // check for abrupt changes in duty, invalidate result
+                end else if(pwmt.duty != (vif.mon_cb.duty & (((1 << bits) - 1)))) begin // check for abrupt changes in duty, invalidate result
                     pwmt.valid_period = 0;
                 end
 

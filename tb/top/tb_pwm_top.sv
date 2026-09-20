@@ -6,7 +6,7 @@ module tb_pwm_top;
   `include "uvm_macros.svh"
   import pwm_tests_pkg::*;
 
-  localparam int  BITS       = 8;
+  localparam int  BITS       = 16;
   localparam int  THRESHOLD  = 14;
   localparam time CLK_PERIOD = 10ns;      // 100 MHz
 

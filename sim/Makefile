@@ -9,12 +9,12 @@ XCRG  := $(BIN)/xcrg
 
 # Knobs
 PHASE     ?= pwm
-TEST      ?= $(PHASE)_smoke_test
+TEST      ?= $(PHASE)_base_test
 SEED      ?= 1
-VERBOSITY ?= UVM_MEDIUM
+VERBOSITY ?= UVM_HIGH
 WAVES     ?= 0
 COV       ?= 0
-TIMEOUT   ?= 20ms
+TIMEOUT   ?= 20000000 # 20ms
 
 TOP   := tb_$(PHASE)_top
 SNAP  := $(PHASE)_snap
