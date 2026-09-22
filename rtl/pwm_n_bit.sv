@@ -28,7 +28,7 @@ module pwm_n_bit #(parameter int BITS = 12, parameter int THRESHOLD = 0) (
     output logic            pwm_out
 );
     logic [BITS-1:0]        D, Q; // Q is the current counter value, D the next
-    assign pwm_out          = (Q <= duty) && duty && (duty > THRESHOLD);
+    assign pwm_out          = (Q <= duty) && (duty > THRESHOLD);
 
     always_ff @(posedge clk, posedge reset) begin
         if(reset) Q <= 0;
