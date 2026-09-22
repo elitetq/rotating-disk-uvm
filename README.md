@@ -181,6 +181,28 @@ packages, the assertion modules, and three of the five filelists. `PHASE=clamp`,
 
 ---
 
+## Constraint strategy: items vs. sequences
+
+Item classes (e.g. `tb/agents/pwm_agent/pwm_item.sv`) only constrain the basic necessities,
+and do it with `soft` constraints:
+
+```systemverilog
+constraint c_range { soft duty inside {[0:(64'b1 << max_bits) - 1]}; }
+constraint c_hold  { soft hold_periods inside {[1:4]}; }
+```
+
+`soft` is the point: it keeps a randomized item inside the DUT's bit width and inside a sane
+default range if nothing else says otherwise, but it yields without conflict to whatever a
+sequence asks for on the same field.
+
+Sequences (`tb/sequences/*.sv`) are where stimulus actually gets shaped, via inline
+constraints on the `randomize() with { ... }` call at each `start_item`/`finish_item`. For
+example `pwm_base_seq` biases `duty` into boundary- and threshold-adjacent bins with a
+`dist`, and `pwm_smoke_seq` pins it to specific edge values — neither has to fight the item's
+own defaults to do it, because those defaults are soft.
+
+---
+
 ## Repository layout
 
 ```
