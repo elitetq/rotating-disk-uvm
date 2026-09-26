@@ -16,7 +16,8 @@ module pwm_n_bit_sva #(parameter int BITS = 8, parameter int THRESHOLD = 0) (
   // R-PWM-2 : the instantaneous output relation, every single cycle.
   a_out_relation: assert property (
     disable iff(reset)
-    @(posedge clk) pwm_out == ((duty > THRESHOLD) && (Q <= duty))
+    // one clock delay, reset must be low for 2 clock periods before assertion is checked to combat X propagation delay
+    @(posedge clk) !$past(reset) |-> (pwm_out == ((duty > THRESHOLD) && (Q <= duty)))
   ) else `uvm_error("SVA_pwm_n_bit","Failed R-PWM-2 assertion.");
 
   // R-PWM-1 : the counter increments by one every cycle and wraps cleanly.

@@ -2,6 +2,7 @@
 -i ../tb/common
 -i ../tb/agents/pwm_agent
 -i ../tb/env
+-i ../tb/sequences
 -i ../tb/tests
 
 # ---- RTL ----

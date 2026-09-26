@@ -13,7 +13,7 @@ class pwm_base_seq extends uvm_sequence #(pwm_item);
     super.new(name);
   endfunction
 
-  task body();
+  virtual task body();
     if(!uvm_config_db#(int)::get(null,"","BITS",bits)) `uvm_fatal("NOCFG","Bits could not be fetched from uvm db.");
     if(!uvm_config_db#(int)::get(null,"","THRESHOLD",threshold)) `uvm_fatal("NOCFG","Threshold could not be fetched from uvm db.");
     max_duty = (64'b1 << bits) - 1;

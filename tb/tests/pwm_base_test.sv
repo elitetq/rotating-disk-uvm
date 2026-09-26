@@ -18,8 +18,9 @@ class pwm_base_test extends uvm_test;
     uvm_top.print_topology();
   endfunction
 
-  task run_phase(uvm_phase phase);
+  virtual task run_phase(uvm_phase phase);
     pwm_base_seq seq;
+    phase.phase_done.set_drain_time(this,4*(64'b1 << env.agent.driver.bits)); // hold for 4 pwm periods after last item
     phase.raise_objection(this);          // "do not end the sim yet"
         seq = pwm_base_seq::type_id::create("seq");
         seq.n_items = 50;
