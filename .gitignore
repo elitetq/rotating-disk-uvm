@@ -9,6 +9,7 @@ xvlog.log
 xelab.log
 xsim.log
 .Xil/
+tr_db.log
 
 # Build outputs
 sim/logs/

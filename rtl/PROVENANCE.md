@@ -38,8 +38,8 @@ blocks:
 ## Local modifications (divergence from upstream)
 
 These are **not** upstream. None of them have been pushed back to `research_2026` yet.
-There are two independent changes, made for different reasons — keep them separate when
-you do push, because only the first is unambiguously a bug fix.
+There are three independent changes, made for different reasons — keep them separate when
+you do push. Changes 1 and 3 are bug fixes; change 2 is a design decision.
 
 ### 1. Step 0.1 — the open control loop (applied 2026-09-14)
 
@@ -107,8 +107,37 @@ high_cycles(duty) = (duty > THRESHOLD) ? duty + 1 : 0        per 2**BITS clocks
   `docs/uvm_plan/02_design_under_test.md` §1.
 - **`&& duty` is redundant.** For any `THRESHOLD >= 0`, `duty > THRESHOLD` already implies
   `duty >= 1`. It is harmless, and it does not rescue a negative `THRESHOLD` either — that
-  is still O-PWM-4, because the mixed-sign comparison is evaluated unsigned. Left in place
-  as written.
+  is still O-PWM-4, because the mixed-sign comparison is evaluated unsigned. Dropped later,
+  on 2026-09-22 in `382e385`; the line became `(Q <= duty) && (duty > THRESHOLD)`.
+
+### 3. R-PWM-5 — output forced low during reset (applied 2026-09-26)
+
+Found by `pwm_reset_test`: on the first sampled cycle of every reset pulse with
+`duty > THRESHOLD`, `pwm_out` was `1`. R-PWM-5 requires reset to force the output low
+within one cycle.
+
+- **`pwm_n_bit.sv`, line 31** — gate the output with `reset`.
+
+  ```diff
+  - assign pwm_out          = (Q <= duty) && (duty > THRESHOLD);
+  + assign pwm_out          = !reset && (Q <= duty) && (duty > THRESHOLD);
+  ```
+
+Reset only clears the counter. The output is combinational, and at `Q = 0` the term
+`Q <= duty` is always true, so during reset the output was `duty > THRESHOLD` — the first
+cycle of a new period, not low. Upstream's `Q < duty` behaves the same way (`0 < duty`), so
+this is an upstream bug, not a side-effect of change 2.
+
+Consequences:
+
+- **The output drops in the same timestep reset asserts** (reset is asynchronous), which
+  satisfies R-PWM-5.
+- **Whole-period behaviour is unchanged.** `high_cycles(duty)` above still holds for every
+  period that does not overlap a reset.
+- **The period restarts at release.** The first cycle after reset deasserts has `Q = 0`, so
+  it is high whenever `duty > THRESHOLD`.
+- **`pwm_out` now has a combinational path from `reset`.** A glitch on `reset` reaches the
+  output directly.
 
 **Every other file is unmodified from `01471d4`.**
 

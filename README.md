@@ -43,7 +43,7 @@ changes made to it). It is the device under test, not part of the verification w
 |---|---|
 | Simulator | Vivado XSim, 2025.2 (any recent release should work) |
 | UVM | UVM-1.2, the copy that ships with Vivado — nothing to install |
-| Build | GNU make, Python 3 for the regression runner |
+| Build | GNU make, Python 3.12+ for the regression runner |
 
 The Makefile looks for Vivado under `$HOME/Vivado/2025.2`. Point it elsewhere with
 `XILINX_ROOT`, either per-invocation or in your environment:
@@ -148,8 +148,42 @@ fails, `xcrg -help` is the place to look.
 
 ### Regressions
 
-`sim/regress.py` is the seeded multi-test runner. **Not written yet** — it is an empty file
-today.
+`sim/regress.py` runs every test in a phase across a range of seeds, one after another, and
+prints a pass/fail table at the end.
+
+```sh
+cd sim
+./regress.py                                        # every test, seed 0 only
+./regress.py --start_seed 1 --seeds 10              # every test, seeds 1–10
+./regress.py --phase pwm --test pwm_corner_test --seeds 50
+./regress.py --clear                                # empty sim/logs/ and exit
+```
+
+![regress.py running all six Phase A tests on seeds 1–10: 60 passes, 0 fails](images/regress_pwm_seeds_1-10.png)
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--phase` | every phase | Restrict to one phase; repeatable. Only `pwm` has tests today |
+| `--test` | every test in the phase | Run one test class instead of the whole list |
+| `--start_seed` | `0` | First seed, inclusive |
+| `--seeds` | `1` | How many consecutive seeds to run |
+| `--cov` | off | Meant to collect coverage on every run — not wired up yet |
+| `--clear` | — | Delete everything in `sim/logs/` and exit without running |
+
+The progress bar prints `.` for a pass and `X` for anything else. The status comes from each
+run's UVM report summary, not from the exit code:
+
+| Status | Meaning |
+|---|---|
+| `PASS` | Report summary present, `UVM_ERROR` and `UVM_FATAL` both 0 |
+| `FAIL` | At least one `UVM_ERROR` or `UVM_FATAL` |
+| `NOREPORT` | No report summary: the simulation crashed, hung, or never started the test |
+| `TOOLFAIL` | `make` itself failed, usually a compile or elaboration error |
+
+Every run still writes its own `sim/logs/<phase>.<test>.<seed>.log`, so a failing row can be
+opened directly or re-run alone with `make PHASE=<phase> TEST=<test> SEED=<seed>`. A Phase A
+test takes 20–27 s, so the ten-seed run above takes about 25 minutes. The script always
+exits 0 for now, so read the table.
 
 ### Cleaning up
 
@@ -206,8 +240,8 @@ What actually runs today, on Vivado 2025.2:
   `pwm_env_pkg.sv`, so nothing compiles it and the run above reports no coverage yet.
 
 Still empty: the `clamp`, `quad` and `ctrl` interfaces, environments, test packages and
-tops; every assertion module and `bind_all.sv`; three of the five filelists; and
-`regress.py`. `PHASE=clamp`, `quad` and `ctrl` will not build.
+tops; every assertion module and `bind_all.sv`; and three of the five filelists.
+`PHASE=clamp`, `quad` and `ctrl` will not build.
 
 ---
 
@@ -226,7 +260,7 @@ tb/
 sim/
   Makefile              The build; see `make help`
   filelists/            One compile filelist per phase
-  regress.py            Seeded regression runner (not written yet)
+  regress.py            Seeded regression runner, see Regressions above
   waves.tcl             What to dump when WAVES=1
 ```
 
