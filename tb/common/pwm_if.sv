@@ -1,6 +1,6 @@
 interface pwm_if(input logic clk);
 
-    localparam MAX_BITS = 16; // Adjust if more slack is needed for UVM
+    localparam MAX_BITS = 32; // Adjust if more slack is needed for UVM
 
     logic                   reset;
     logic [MAX_BITS-1:0]    duty;
@@ -22,6 +22,5 @@ interface pwm_if(input logic clk);
 
     modport DRV (clocking drv_cb);
     modport MON (clocking mon_cb);
-
 
 endinterface

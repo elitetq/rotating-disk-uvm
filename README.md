@@ -6,13 +6,15 @@ that ties them together. Constrained-random stimulus, self-checking scoreboards 
 golden models, SystemVerilog assertions bound to the RTL, and functional coverage, all
 running on Vivado XSim.
 
-> ### ⚠️ Status: not built yet
+> ### ⚠️ Status: Phase A works, the rest is not built
 >
-> This is work in progress and early. Today the repo has the build infrastructure, the
-> interfaces, the testbench tops and a UVM smoke test; the agents, environments,
-> scoreboards, assertions and tests are still stubs. Nothing here verifies anything yet.
-> **The commands below describe how it is meant to be driven once it is built** — most of
-> them will not do anything useful in the meantime. See
+> Phase A (`pwm_n_bit`) is a working self-checking UVM environment — interface, agent,
+> monitor, scoreboard and a constrained-random test that runs clean against the golden
+> model. Functional coverage is half-wired and the assertions are not written yet. Phases
+> B, C and D — the magnitude clamp, the quadrature decoder and the integrated controller —
+> are still empty stubs.
+> **The commands below describe how the whole thing is meant to be driven once it is
+> built**; outside Phase A most of them will not do anything useful. See
 > [Current state](#current-state) for what actually runs.
 
 ---
@@ -41,7 +43,7 @@ changes made to it). It is the device under test, not part of the verification w
 |---|---|
 | Simulator | Vivado XSim, 2025.2 (any recent release should work) |
 | UVM | UVM-1.2, the copy that ships with Vivado — nothing to install |
-| Build | GNU make, Python 3 for the regression runner |
+| Build | GNU make, Python 3.12+ for the regression runner |
 
 The Makefile looks for Vivado under `$HOME/Vivado/2025.2`. Point it elsewhere with
 `XILINX_ROOT`, either per-invocation or in your environment:
@@ -82,9 +84,9 @@ make PHASE=ctrl  TEST=ctrl_step_response_test VERBOSITY=UVM_HIGH
 | Knob | Values | Default | What it does |
 |---|---|---|---|
 | `PHASE` | `pwm`, `clamp`, `quad`, `ctrl` | `pwm` | Picks the DUT, its filelist and its testbench top |
-| `TEST` | a UVM test class name | `<PHASE>_smoke_test` | Passed through as `+UVM_TESTNAME` |
+| `TEST` | a UVM test class name | `<PHASE>_base_test` | Passed through as `+UVM_TESTNAME` |
 | `SEED` | integer | `1` | Randomization seed (`-sv_seed`) |
-| `VERBOSITY` | `UVM_LOW`, `UVM_MEDIUM`, `UVM_HIGH`, `UVM_DEBUG` | `UVM_MEDIUM` | UVM report verbosity |
+| `VERBOSITY` | `UVM_LOW`, `UVM_MEDIUM`, `UVM_HIGH`, `UVM_DEBUG` | `UVM_HIGH` | UVM report verbosity |
 | `WAVES` | `0`, `1` | `0` | Dump a waveform database |
 | `COV` | `0`, `1` | `0` | Collect functional coverage |
 | `TIMEOUT` | a delay | `20ms` | Global watchdog, read as `+UVM_TIMEOUT` |
@@ -128,14 +130,14 @@ make gui                                # interactive, opens the XSim GUI
 dumped. Open a saved database later with:
 
 ```sh
-xsim --gui logs/pwm_pwm_smoke_test_1.wdb
+xsim --gui logs/pwm_pwm_base_test_1.wdb
 ```
 
 ### Coverage
 
 ```sh
-make COV=1 PHASE=pwm TEST=pwm_random_test SEED=1
-make COV=1 PHASE=pwm TEST=pwm_random_test SEED=2
+make COV=1 PHASE=pwm TEST=pwm_base_test SEED=1
+make COV=1 PHASE=pwm TEST=pwm_base_test SEED=2
 make cov                                # merge everything into cov_report/
 ```
 
@@ -146,8 +148,42 @@ fails, `xcrg -help` is the place to look.
 
 ### Regressions
 
-`sim/regress.py` is the seeded multi-test runner. **Not written yet** — it is an empty file
-today.
+`sim/regress.py` runs every test in a phase across a range of seeds, one after another, and
+prints a pass/fail table at the end.
+
+```sh
+cd sim
+./regress.py                                        # every test, seed 0 only
+./regress.py --start_seed 1 --seeds 10              # every test, seeds 1–10
+./regress.py --phase pwm --test pwm_corner_test --seeds 50
+./regress.py --clear                                # empty sim/logs/ and exit
+```
+
+![regress.py running all six Phase A tests on seeds 1–10: 60 passes, 0 fails](images/regress_pwm_seeds_1-10.png)
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--phase` | every phase | Restrict to one phase; repeatable. Only `pwm` has tests today |
+| `--test` | every test in the phase | Run one test class instead of the whole list |
+| `--start_seed` | `0` | First seed, inclusive |
+| `--seeds` | `1` | How many consecutive seeds to run |
+| `--cov` | off | Meant to collect coverage on every run — not wired up yet |
+| `--clear` | — | Delete everything in `sim/logs/` and exit without running |
+
+The progress bar prints `.` for a pass and `X` for anything else. The status comes from each
+run's UVM report summary, not from the exit code:
+
+| Status | Meaning |
+|---|---|
+| `PASS` | Report summary present, `UVM_ERROR` and `UVM_FATAL` both 0 |
+| `FAIL` | At least one `UVM_ERROR` or `UVM_FATAL` |
+| `NOREPORT` | No report summary: the simulation crashed, hung, or never started the test |
+| `TOOLFAIL` | `make` itself failed, usually a compile or elaboration error |
+
+Every run still writes its own `sim/logs/<phase>.<test>.<seed>.log`, so a failing row can be
+opened directly or re-run alone with `make PHASE=<phase> TEST=<test> SEED=<seed>`. A Phase A
+test takes 20–27 s, so the ten-seed run above takes about 25 minutes. The script always
+exits 0 for now, so read the table.
 
 ### Cleaning up
 
@@ -171,13 +207,41 @@ What actually runs today, on Vivado 2025.2:
   Prints `UVM is alive on XSim` and exits. (`TOP` has to be given explicitly here because
   this top is named `tb_hello`, not `tb_hello_top`.)
 
-- **`make PHASE=pwm`** — compiles and runs, but the stimulus is a hardcoded `initial`
-  block in `tb/top/tb_pwm_top.sv`, not a UVM driver. `run_test()` is still commented out,
-  so `TEST` is ignored. It exercises the DUT; it checks nothing.
+- **Golden model** — `tb/common/dut_pkg.sv` is real: `expected_pwm_high(duty, threshold)`
+  and `pwm_period(bits)`, pure functions with no UVM dependency. Hand-checked against a
+  table of duty values by a throwaway top in `tb/top/scrap/`.
 
-Everything else is an empty file: all four agents, all four environments, all the test
-packages, the assertion modules, and three of the five filelists. `PHASE=clamp`, `quad` and
-`ctrl` will not build.
+- **Phase A runs end to end and checks itself.**
+
+  ```sh
+  cd sim && make PHASE=pwm TEST=pwm_base_test
+  ```
+
+  Compiles, elaborates and runs clean — `UVM_ERROR : 0`, with the scoreboard reporting on
+  50 randomized duty values. The whole loop is in place:
+
+  - `tb/common/pwm_if.sv` — one interface with `drv_cb` / `mon_cb` clocking blocks and a
+    wide `MAX_BITS` bus the top narrows to the DUT's parameter.
+  - `tb/top/tb_pwm_top.sv` — clock, DUT, interface, and the `uvm_config_db` handoff of
+    `vif`, `BITS` and `THRESHOLD` before `run_test()`.
+  - `tb/agents/pwm_agent/` — `pwm_item` (constrained `duty` and `hold_periods`),
+    `pwm_driver`, `pwm_monitor`, a typedef'd sequencer and `pwm_agent`, all `` `include ``d
+    into `pwm_agent_pkg.sv`. The driver and sequencer are gated on `get_is_active()`, so
+    the agent is already usable passively — which is what Phase D needs.
+  - `tb/env/pwm_env.sv` + `pwm_scoreboard.sv` — the monitor's analysis port fans out to a
+    scoreboard that checks every completed period against `dut_pkg::expected_pwm_high`.
+  - `tb/tests/` — `pwm_base_seq` and `pwm_base_test`.
+
+  The monitor integrates `pwm_out` over a full `2**BITS` period and marks periods where
+  `duty` moved mid-period; the scoreboard skips those rather than scoring them.
+
+- **Functional coverage (Step A7) — in progress.** `tb/env/pwm_coverage.sv` is written and
+  `pwm_env` creates and connects it, but it is not yet `` `include ``d in
+  `pwm_env_pkg.sv`, so nothing compiles it and the run above reports no coverage yet.
+
+Still empty: the `clamp`, `quad` and `ctrl` interfaces, environments, test packages and
+tops; every assertion module and `bind_all.sv`; and three of the five filelists.
+`PHASE=clamp`, `quad` and `ctrl` will not build.
 
 ---
 
@@ -192,10 +256,11 @@ tb/
   env/                  Per-phase environments: agents + scoreboard + coverage
   tests/                Sequences and tests
   top/                  Per-phase testbench tops — clock, DUT, interface, run_test
+    scrap/              Throwaway experiments with their own Makefile — gitignored
 sim/
   Makefile              The build; see `make help`
   filelists/            One compile filelist per phase
-  regress.py            Seeded regression runner (not written yet)
+  regress.py            Seeded regression runner, see Regressions above
   waves.tcl             What to dump when WAVES=1
 ```
 

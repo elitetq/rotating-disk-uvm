@@ -4,9 +4,9 @@ module tb_pwm_top;
 
   import uvm_pkg::*;
   `include "uvm_macros.svh"
-//   import pwm_tests_pkg::*;
+  import pwm_tests_pkg::*;
 
-  localparam int  BITS       = 8;
+  localparam int  BITS       = 16;
   localparam int  THRESHOLD  = 14;
   localparam time CLK_PERIOD = 10ns;      // 100 MHz
 
@@ -23,20 +23,21 @@ module tb_pwm_top;
   );
 
   // GATE A1 ONLY: hardcoded stimulus, delete once the driver exists.
-  initial begin
-    vif.reset = 1; vif.duty = '0;
-    repeat(5) @(posedge clk);
-    vif.duty = 100;
-    vif.reset = 0;
-    repeat(3 * 2**BITS) @(posedge clk);
-    $finish;
-  end
-
   // initial begin
-  //   uvm_config_db#(virtual pwm_if)::set(null, "*", "vif",       vif);
-  //   uvm_config_db#(int)::set          (null, "*", "BITS",       BITS);
-  //   uvm_config_db#(int)::set          (null, "*", "THRESHOLD",  THRESHOLD);
-  //   run_test();                            // test name comes from +UVM_TESTNAME
+  //   vif.reset = 1; vif.duty = '0;
+  //   repeat(5) @(posedge clk);
+  //   vif.duty = 100;
+  //   vif.reset = 0;
+  //   repeat(3 * 2**BITS) @(posedge clk);
+  //   $finish;
   // end
+
+
+  initial begin
+    uvm_config_db#(virtual pwm_if)::set(null, "*", "vif",       vif);
+    uvm_config_db#(int)::set          (null, "*", "BITS",       BITS);
+    uvm_config_db#(int)::set          (null, "*", "THRESHOLD",  THRESHOLD);
+    run_test();                            // test name comes from +UVM_TESTNAME
+  end
 
 endmodule
