@@ -8,7 +8,10 @@ class pwm_base_test extends uvm_test;
   endfunction
 
   function void build_phase(uvm_phase phase);
+    int n;
     super.build_phase(phase);
+    $value$plusargs("UVM_MAX_QUIT_COUNT=%d",n);
+    uvm_report_server::get_server().set_max_quit_count(n);
     env = pwm_env::type_id::create("env", this);
   endfunction
 

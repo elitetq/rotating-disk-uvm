@@ -23,5 +23,4 @@ interface pwm_if(input logic clk);
     modport DRV (clocking drv_cb);
     modport MON (clocking mon_cb);
 
-
 endinterface

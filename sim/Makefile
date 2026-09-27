@@ -15,6 +15,7 @@ VERBOSITY ?= UVM_HIGH
 WAVES     ?= 0
 COV       ?= 0
 TIMEOUT   ?= 20000000 # 20ms
+ERROR_CAP ?= 20
 
 TOP   := tb_$(PHASE)_top
 SNAP  := $(PHASE)_snap
@@ -27,7 +28,8 @@ XELAB_FLAGS := -L uvm --relax -timescale 1ns/1ps -s $(SNAP)
 XSIM_FLAGS  := -runall -sv_seed $(SEED) \
                -testplusarg "UVM_TESTNAME=$(TEST)" \
                -testplusarg "UVM_VERBOSITY=$(VERBOSITY)" \
-               -testplusarg "UVM_TIMEOUT=$(TIMEOUT)"
+               -testplusarg "UVM_TIMEOUT=$(TIMEOUT)" \
+			   -testplusarg "UVM_MAX_QUIT_COUNT=$(ERROR_CAP)"
 
 ifeq ($(WAVES),1)
   XELAB_FLAGS += -debug typical
@@ -35,7 +37,8 @@ ifeq ($(WAVES),1)
                  -sv_seed $(SEED) \
                  -testplusarg "UVM_TESTNAME=$(TEST)" \
                  -testplusarg "UVM_VERBOSITY=$(VERBOSITY)" \
-                 -testplusarg "UVM_TIMEOUT=$(TIMEOUT)"
+                 -testplusarg "UVM_TIMEOUT=$(TIMEOUT)" \
+				 -testplusarg "UVM_MAX_QUIT_COUNT=$(ERROR_CAP)"
 endif
 
 ifeq ($(COV),1)

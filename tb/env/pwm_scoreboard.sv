@@ -28,6 +28,7 @@ class pwm_scoreboard extends uvm_scoreboard;
             `uvm_info("NOPER","Given period is not valid, skipping transaction.", UVM_HIGH);
         end else begin
             if(pwmt.high_cycles != expected_pwm_high(pwmt.duty,threshold)) begin
+                `uvm_error("pwm_scoreboard",$sformatf("Duty: %0d, Expected High: %0d, Actual High: %0d",pwmt.duty,expected_pwm_high(pwmt.duty,threshold),pwmt.high_cycles))
                 fail += 1;
             end else begin
                 pass += 1;

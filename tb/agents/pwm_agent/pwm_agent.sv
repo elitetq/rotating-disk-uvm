@@ -7,13 +7,13 @@ class pwm_agent extends uvm_agent;
 
     pwm_driver    driver;
     pwm_sequencer sequencer;
-    pwm_monitor   monitor; // not implemented yet
+    pwm_monitor   monitor;
 
     uvm_analysis_port #(pwm_transaction) ap;    // forwarded from the monitor
 
     function new(string name, uvm_component parent);
       super.new(name, parent);
-      ap      = new("ap_agent", this);
+      ap      = new("ap_pwm_agent", this);
     endfunction
 
     function void build_phase(uvm_phase phase);
