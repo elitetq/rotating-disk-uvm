@@ -67,14 +67,16 @@ gui: elab
 	  -testplusarg "UVM_TESTNAME=$(TEST)" \
 	  -testplusarg "UVM_VERBOSITY=$(VERBOSITY)"
 
-# Merge every coverage database of PHASE into an HTML report (sim/cov_report/functionalCoverageReport/dashboard.html).
+# Merge every coverage database of PHASE into an HTML report (sim/cov_report/<phase>/functionalCoverageReport/dashboard.html).
+# COV_GLOB narrows it to a subset, e.g. COV_GLOB='clamp_clamp_random_test_*'.
 # xsim writes xsim.covdb/<name>/ itself, so -cov_db_dir is the directory *above* xsim.covdb.
 # The <phase>_snap entry is the design snapshot, not a run, so it is left out.
-COV_DBS := $(notdir $(filter-out %_snap,$(wildcard xsim.covdb/$(PHASE)_*)))
+COV_GLOB ?= $(PHASE)_*
+COV_DBS  := $(notdir $(filter-out %_snap,$(wildcard xsim.covdb/$(COV_GLOB))))
 
 cov:
 	@test -n "$(COV_DBS)" || { echo "no coverage databases for PHASE=$(PHASE); run with COV=1"; exit 1; }
-	$(XCRG) -cov_db_dir . $(addprefix -cov_db_name ,$(COV_DBS)) -report_dir ./cov_report -report_format html -log $(LOGS)/xcrg.$(PHASE).log
+	$(XCRG) -cov_db_dir . $(addprefix -cov_db_name ,$(COV_DBS)) -report_dir ./cov_report/$(PHASE) -report_format html -log $(LOGS)/xcrg.$(PHASE).log
 
 clean:
 	rm -rf xsim.dir $(LOGS) *.jou *.pb *.wdb .Xil webtalk*
