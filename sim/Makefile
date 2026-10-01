@@ -85,7 +85,7 @@ veryclean: clean
 	rm -rf xsim.covdb cov_report run
 
 help:
-	@echo "PHASE     = pwm | clamp | quad | ctrl      (default: pwm)"
+	@echo "PHASE     = pwm | clamp                   (default: pwm)"
 	@echo "TEST      = UVM test class name           (default: <PHASE>_smoke_test)"
 	@echo "SEED      = integer                       (default: 1)"
 	@echo "VERBOSITY = UVM_LOW|UVM_MEDIUM|UVM_HIGH|UVM_DEBUG"

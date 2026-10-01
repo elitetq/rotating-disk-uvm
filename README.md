@@ -11,10 +11,11 @@ SVA bound to the RTL, and functional coverage, on Vivado XSim.
 |---|---|---|
 | A — `pwm` | `pwm_n_bit` | **Done.** Agent (plus an extended driver/item swapped in by factory override), env, scoreboard, coverage, bound SVA, 6 tests |
 | B — `clamp` | `magnitude_clamp` | **Done.** Agent, env, scoreboard, coverage, bound SVA, 2 tests |
-| C — `quad` | `decoder_to_32_bit` | **Not started.** All files are empty stubs |
-| D — `ctrl` | `prop_ctrl_pwm` | **Not started.** Will reuse the `quad` agent (active) and `pwm` agent (passive) unchanged |
+| C — `quad` | `decoder_to_32_bit` | **To do** — see [Roadmap](#roadmap) |
+| D — `ctrl` | `prop_ctrl_pwm` | **To do** — see [Roadmap](#roadmap) |
 
-`PHASE=quad` and `PHASE=ctrl` do not build yet.
+Work stopped after Phase B. Phases C and D have no files in the tree; they are described in the
+[Roadmap](#roadmap) so the work can be picked up later.
 
 ## About this project
 
@@ -52,7 +53,7 @@ make PHASE=hello TOP=tb_hello TEST=hello_test           # UVM smoke test
 
 | Knob | Default | Meaning |
 |---|---|---|
-| `PHASE` | `pwm` | `pwm`, `clamp`, `quad`, `ctrl`; selects `TOP=tb_<PHASE>_top`, `filelists/<PHASE>.f` and the snapshot |
+| `PHASE` | `pwm` | `pwm`, `clamp` (`quad`, `ctrl` are on the [Roadmap](#roadmap)); selects `TOP=tb_<PHASE>_top`, `filelists/<PHASE>.f` and the snapshot |
 | `TEST` | `<PHASE>_base_test` | UVM test class, passed as `+UVM_TESTNAME` |
 | `SEED` | `1` | `-sv_seed` |
 | `VERBOSITY` | `UVM_HIGH` | UVM report verbosity |
@@ -108,6 +109,46 @@ make cov PHASE=clamp                                    # merge
 
 `make clean` removes build artifacts, logs and waveforms. `make veryclean` also removes
 coverage databases and reports.
+
+## Roadmap
+
+Not started. The requirements (`R-QUD-*`, `R-CTL-*`, `R-SYS-*`) and observations (`O-QUAD-*`,
+`O-CTRL-*`) for both phases are already written in [`REQUIREMENTS.md`](REQUIREMENTS.md).
+
+### Phase C — `quad` (`decoder_to_32_bit`)
+
+The driver speaks a pin-level Gray-code protocol on the two encoder channels, not values.
+
+- [ ] `tb/common/quad_if.sv`: interface with clocking block and DRV/MON modports
+- [ ] `tb/agents/quad_agent/`: item, driver (Gray-code sequencing, dither, rate control),
+  monitor, agent, `quad_agent_pkg.sv`
+- [ ] `dut_pkg`: golden model for the count
+- [ ] `tb/env/quad_env_pkg.sv`: env, scoreboard, coverage
+- [ ] `tb/common/sva/first_value_priority_sva.sv` and a bind file (R-QUD-2, 4, 5, 8)
+- [ ] `tb/sequences/` and `tb/tests/quad_tests_pkg.sv`: smoke, directional, dither, max-rate,
+  reset, random
+- [ ] `tb/top/tb_quad_top.sv`, `sim/filelists/quad.f`, `quad` entry in `regress.py` `TESTS`
+- [ ] Settle R-QUD-6: the maximum quadrature rate (O-QUAD-1 suggests about 12.5 M cycles/s)
+
+### Phase D — `ctrl` (`prop_ctrl_pwm`)
+
+Integration. Reuses the `quad` agent (active) and the `pwm` agent (**passive**) unmodified, so
+the agents must keep the `get_is_active()` gate described under [Conventions](#conventions).
+
+- [ ] `tb/common/ctrl_if.sv`: interface for the reference, `k` and motor pins
+- [ ] `dut_pkg`: golden model for `error`, `error_scaled`, `pwm_cmp` and the motor direction
+- [ ] `tb/env/ctrl_env_pkg.sv`: quad agent (active) + pwm agent (passive) + scoreboard +
+  coverage
+- [ ] `tb/common/sva/controller_sva.sv` and a bind file (R-CTL-1, 6; R-SYS-1)
+- [ ] `tb/tests/ctrl_tests_pkg.sv`: closed-loop convergence (R-SYS-5), deadband (R-SYS-4),
+  overflow in `error × k` (O-CTRL-1)
+- [ ] `tb/top/tb_ctrl_top.sv`, `sim/filelists/ctrl.f` (adds `tb/common/bufg_stub.sv`), `ctrl`
+  entry in `regress.py` `TESTS`
+- [ ] Settle R-CTL-4 and R-CTL-5: the legal range of `k`, and whether overflow is a bug or out
+  of spec
+
+The Makefile derives `TOP`, `FLIST` and `SNAP` from `PHASE`, so a new phase needs only
+`tb_<phase>_top`, `filelists/<phase>.f` and a `TESTS` entry in `regress.py`.
 
 ## Layout
 
