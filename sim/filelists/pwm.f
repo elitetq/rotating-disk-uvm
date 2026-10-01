@@ -11,13 +11,13 @@
 # ---- TB common ----
 ../tb/common/dut_pkg.sv
 ../tb/common/pwm_if.sv
-../tb/common/sva/pwm_n_bit_sva.sv
 
-# ---- Agent / env / tests ----
+# ---- Agent / env / tests / sva ----
 ../tb/agents/pwm_agent/pwm_agent_pkg.sv
 ../tb/env/pwm_env_pkg.sv
 ../tb/tests/pwm_tests_pkg.sv
+../tb/common/sva/pwm_n_bit_sva.sv
 
 # ---- Bind + top ----
-../tb/common/sva/bind_all.sv
+../tb/common/sva/bind/bind_pwm.sv
 ../tb/top/tb_pwm_top.sv

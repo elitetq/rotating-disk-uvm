@@ -42,7 +42,7 @@ ifeq ($(WAVES),1)
 endif
 
 ifeq ($(COV),1)
-  XSIM_FLAGS += -cov_db_dir ./xsim.covdb -cov_db_name $(PHASE)_$(TEST)_$(SEED)
+  XSIM_FLAGS += -cov_db_dir . -cov_db_name $(PHASE)_$(TEST)_$(SEED)
 endif
 
 .PHONY: all compile elab run gui cov clean veryclean help
@@ -67,10 +67,14 @@ gui: elab
 	  -testplusarg "UVM_TESTNAME=$(TEST)" \
 	  -testplusarg "UVM_VERBOSITY=$(VERBOSITY)"
 
-# Merge whatever coverage databases exist into an HTML report.
-# Flags vary between Vivado releases — run `$(XCRG) -help` and fix these once.
+# Merge every coverage database of PHASE into an HTML report (sim/cov_report/functionalCoverageReport/dashboard.html).
+# xsim writes xsim.covdb/<name>/ itself, so -cov_db_dir is the directory *above* xsim.covdb.
+# The <phase>_snap entry is the design snapshot, not a run, so it is left out.
+COV_DBS := $(notdir $(filter-out %_snap,$(wildcard xsim.covdb/$(PHASE)_*)))
+
 cov:
-	$(XCRG) -dir ./xsim.covdb -report_format html -report_dir ./cov_report
+	@test -n "$(COV_DBS)" || { echo "no coverage databases for PHASE=$(PHASE); run with COV=1"; exit 1; }
+	$(XCRG) -cov_db_dir . $(addprefix -cov_db_name ,$(COV_DBS)) -report_dir ./cov_report -report_format html -log $(LOGS)/xcrg.$(PHASE).log
 
 clean:
 	rm -rf xsim.dir $(LOGS) *.jou *.pb *.wdb .Xil webtalk*

@@ -17,9 +17,9 @@ class pwm_env extends uvm_env;
     function void build_phase(uvm_phase phase);
         super.build_phase(phase);
         uvm_config_db#(uvm_active_passive_enum)::set(this, "agent", "is_active", UVM_ACTIVE); // set active state so pwm_agent instantiates driver and sequencer. Note that it is scoped to "agent" which is important because our agent is also called "agent", otherwise it wont be able to read is_active
-        agent = pwm_agent::type_id::create("agent",this);
-        scoreboard = pwm_scoreboard::type_id::create("scoreboard",this);
-        coverage = pwm_coverage::type_id::create("coverage",this);
+        agent = pwm_agent::type_id::create("agent", this);
+        scoreboard = pwm_scoreboard::type_id::create("scoreboard", this);
+        coverage = pwm_coverage::type_id::create("coverage", this);
     endfunction
 
 endclass

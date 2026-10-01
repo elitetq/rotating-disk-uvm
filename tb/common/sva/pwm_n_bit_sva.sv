@@ -1,7 +1,6 @@
 import uvm_pkg::*;
 `include "uvm_macros.svh"
-// Bound into pwm_n_bit — see bind_all.sv. The RTL is never edited.
-// Note this module receives Q, an internal DUT signal. `bind` can see internals,
+// Note: this module receives Q, an internal DUT signal. `bind` can see internals,
 // which is exactly what makes it useful for white-box checking.
 module pwm_n_bit_sva #(parameter int BITS = 8, parameter int THRESHOLD = 0) (
   input logic            clk,

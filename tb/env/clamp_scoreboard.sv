@@ -23,12 +23,18 @@ class clamp_scoreboard extends uvm_scoreboard;
     endfunction
 
     virtual function void write(clamp_transaction t);
+        automatic int error_flag = 0; // Used so fail / pass can be incremented once
         if(t.clamped_value !== expected_clamp_val(t.value,clamp_val)) begin
             `uvm_error("clamp_scoreboard",$sformatf("Invalid clamped_val: expected: %0d, Got: %0d",expected_clamp_val(t.value,clamp_val),t.clamped_value))
+            error_flag = 1;
         end
         if(t.dir !== expected_clamp_dir(t.value)) begin
             `uvm_error("clamp_scoreboard",$sformatf("Invalid dir: expected: %0d, Got: %0d",expected_clamp_dir(t.value),t.dir))
+            error_flag = 1;
         end
+        if(error_flag) fail += 1;
+        else pass += 1;
+
     endfunction
 
     function void check_phase(uvm_phase phase);

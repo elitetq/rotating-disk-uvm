@@ -6,6 +6,7 @@ package clamp_tests_pkg;
     import clamp_agent_pkg::*;
 
     `include "clamp_base_seq.sv"
+    `include "clamp_random_seq.sv"
     `include "clamp_base_test.sv"
     `include "clamp_random_test.sv"
 endpackage

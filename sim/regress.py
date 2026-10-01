@@ -16,12 +16,13 @@ from pathlib import Path
 
 CUR_DIR = Path(__file__).resolve().parent
 
-TESTS = {"pwm": ["pwm_smoke_test","pwm_base_test","pwm_corner_test","pwm_duty_change_test","pwm_random_test","pwm_reset_test"]}
+TESTS = {"pwm": ["pwm_smoke_test","pwm_base_test","pwm_corner_test","pwm_duty_change_test","pwm_random_test","pwm_reset_test"],
+         "clamp": ["clamp_base_test","clamp_random_test"]}
 
 SEV = re.compile(r"^UVM_(INFO|WARNING|ERROR|FATAL)\s*:\s*(\d+)", re.M) # filtering constructor for UVM numbers
 
 def run_once(phase, test, seed = 0, cov = 0, quit_count = 20):
-    cmd = ['make','-s',f'PHASE={phase}',f'TEST={test}',f'SEED={seed}',f'COV={cov}',f'ERROR_CAP={quit_count}','run']
+    cmd = ['make','-s',f'PHASE={phase}',f'TEST={test}',f'SEED={seed}',f'COV={int(cov)}',f'ERROR_CAP={quit_count}','run']
     t0 = time.time()
     process = subprocess.run(cmd,cwd=CUR_DIR,capture_output=True,text=True)
     elapsed_time = time.time() - t0
